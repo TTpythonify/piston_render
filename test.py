@@ -1,23 +1,66 @@
 import requests
 import json
+import traceback
 
-# Your Render Piston API URL
-url = "https://piston-render.onrender.com/execute"
+url = "http://127.0.0.1:8000/execute"
 
-# Code you want to run
+java_code = """
+public class Test {
+    public static void main(String[] args) {
+        System.out.println("Java is working!");
+    }
+}
+"""
+
 payload = {
-    "language": "python",
-    "code": "print(2+3)"
+    "language": "java",
+    "code": java_code
 }
 
-# Send POST request
-response = requests.post(url, json=payload)
+print("=== Sending request ===")
 
-# Parse JSON response
-result = response.json()
+try:
+    response = requests.post(url, json=payload)
 
-print("STDOUT:")
-print(result.get("stdout"))
+    print("\n=== Response Info ===")
+    print("Status Code:", response.status_code)
+    print("Raw Text:", response.text)
 
-print("STDERR:")
-print(result.get("stderr"))
+    print("\n=== Parsed JSON (if valid) ===")
+    try:
+        data = response.json()
+        print(json.dumps(data, indent=4))
+
+        # Print stderr if included
+        if isinstance(data, dict) and "stderr" in data:
+            print("\n=== STDERR from server ===")
+            print(data["stderr"])
+
+    except json.JSONDecodeError:
+        print("❌ Response was not valid JSON")
+
+except Exception as e:
+    print("\n=== Exception occurred ===")
+    print(type(e).__name__, str(e))
+    print("\n=== Full Traceback ===")
+    traceback.print_exc()
+
+
+""""
+=== Sending request ===
+
+=== Response Info ===
+Status Code: 200
+Raw Text: {"stderr":"/bin/bash: line 1: javac: command not found\n","stdout":""}
+
+
+=== Parsed JSON (if valid) ===
+{
+    "stderr": "/bin/bash: line 1: javac: command not found\n",
+    "stdout": ""
+}
+
+=== STDERR from server ===
+/bin/bash: line 1: javac: command not found
+}
+"""
