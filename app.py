@@ -23,6 +23,8 @@ LANG_FILENAMES = {
     "cpp": "main.cpp"
 }
 
+import re
+
 @app.post("/execute")
 def execute():
     data = request.get_json()
@@ -32,7 +34,17 @@ def execute():
     if language not in LANG_COMMANDS:
         return jsonify({"error": "Unsupported language"}), 400
 
-    filename = LANG_FILENAMES[language]
+    # For Java, detect class name dynamically
+    if language == "java":
+        match = re.search(r'public\s+class\s+(\w+)', code)
+        if not match:
+            return jsonify({"error": "No public class found in Java code"}), 400
+        class_name = match.group(1)
+        filename = f"{class_name}.java"
+        command = ["bash", "-c", f"javac {filename} && java {class_name}"]
+    else:
+        filename = LANG_FILENAMES[language]
+        command = LANG_COMMANDS[language]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         filepath = os.path.join(tmpdir, filename)
@@ -41,7 +53,7 @@ def execute():
 
         try:
             result = subprocess.run(
-                LANG_COMMANDS[language],
+                command,
                 cwd=tmpdir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -56,6 +68,7 @@ def execute():
             return jsonify({"error": "Timeout"}), 400
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
 
 @app.get("/")
 def home():
